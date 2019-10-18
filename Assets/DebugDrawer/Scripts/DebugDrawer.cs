@@ -198,6 +198,16 @@ public class DebugDrawer : MonoBehaviour
         });
     }
     
+    void InternalDrawWireQuad(Vector3[] corners, Color color)
+    {
+        Assert.IsTrue(corners.Length == 4);
+        
+        InternalDrawLine(corners[0], corners[1], color);
+        InternalDrawLine(corners[1], corners[2], color);
+        InternalDrawLine(corners[2], corners[3], color);
+        InternalDrawLine(corners[3], corners[0], color);
+    }
+    
     // ---------- Public Interfaces 
 
     [Conditional("DEVELOPMENT_BUILD"), Conditional("UNITY_EDITOR")]
@@ -216,5 +226,16 @@ public class DebugDrawer : MonoBehaviour
     public static void DrawFilledQuad(Vector3[] corners, Color[] colors)
     {
         s_Instance.InternalDrawFilledQuad(corners, colors);
+    }
+
+    /// <summary>
+    /// Draw a wire quad (2 triangles) using the 4 corners provided.
+    /// </summary>
+    /// <param name="corners">4 Vector3 that are the 4 corner of the quad</param>
+    /// <param name="color">A color for the wire</param>
+    [Conditional("DEVELOPMENT_BUILD"), Conditional("UNITY_EDITOR")]
+    public static void DrawWireQuad(Vector3[] corners, Color color)
+    { 
+        s_Instance.InternalDrawWireQuad(corners, color);
     }
 }

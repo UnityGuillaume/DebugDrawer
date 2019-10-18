@@ -8,7 +8,7 @@ public class TestScript : MonoBehaviour
 {
     float timer = 0;
 
-    int count = 5000;
+    int count = 10;
     
     Vector3[] randomPoints;
     Color[] randomColor;
@@ -36,7 +36,7 @@ public class TestScript : MonoBehaviour
         for (int i = 0; i < count; ++i)
         {
             DebugDrawer.DrawLine(randomPoints[i*2+0], randomPoints[i*2+1], randomColor[i]);
-            DebugDrawer.DrawFilledQuad(randomPointQuad[i], randomColorQuad[i]);
+            DebugDrawer.DrawWireQuad(randomPointQuad[i], randomColorQuad[i][0]);
         }
     }
 
