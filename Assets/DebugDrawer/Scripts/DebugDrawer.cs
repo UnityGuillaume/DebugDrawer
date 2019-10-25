@@ -10,21 +10,32 @@ using Debug = UnityEngine.Debug;
 
 public class DebugDrawer : MonoBehaviour
 {
+    const int k_StartMaxVertices = UInt16.MaxValue;
     static DebugDrawer s_Instance;
     
     CommandBuffer buffer;
 
-    List<Vector3> m_LineVertices = new List<Vector3>();
-    List<Color> m_LineColors = new List<Color>();
-    List<int> m_LineIndices = new List<int>();
-    
-    List<Vector3> m_QuadVertices = new List<Vector3>();
-    List<Color> m_QuadColors = new List<Color>();
-    List<int> m_QuadIndices = new List<int>();
+    int m_LineMaxArraySize = k_StartMaxVertices;
+    //TODO : Maybe can merge vertices and indices count for lines, as we never reuse vertices?
+    int m_LineVerticeCount = 0;
+    Vector3[] m_LineVertices = new Vector3[k_StartMaxVertices];
+    Color[] m_LineColors = new Color[k_StartMaxVertices];
+    int m_LineIndicesCount = 0;
+    int[] m_LineIndices = new int[k_StartMaxVertices];
+
+    int m_QuadMaxArraySize = k_StartMaxVertices;
+    int m_QuadVerticeCount = 0;
+    Vector3[] m_QuadVertices = new Vector3[k_StartMaxVertices];
+    Color[] m_QuadColors = new Color[k_StartMaxVertices];
+    int m_QuadIndicesCount = 0;
+    int[] m_QuadIndices = new int[k_StartMaxVertices];
 
     Mesh m_LinesMesh;
     Mesh m_QuadMesh;
     Material m_DebugMaterial;
+
+    bool m_MaxLineVerticeReached = false;
+    bool m_MaxQuadVerticeReached = false;
 
     [RuntimeInitializeOnLoadMethod]
     static void Init()
@@ -116,13 +127,23 @@ public class DebugDrawer : MonoBehaviour
 
     void CleanupPostFrame()
     {
-        m_LineVertices.Clear();
-        m_LineColors.Clear();
-        m_LineIndices.Clear();
-        
-        m_QuadVertices.Clear();
-        m_QuadColors.Clear();
-        m_QuadIndices.Clear();
+        m_LineVerticeCount = 0;
+        m_LineIndicesCount = 0;
+
+        m_QuadVerticeCount = 0;
+        m_QuadIndicesCount = 0;
+
+        if (m_MaxLineVerticeReached)
+        {
+            Debug.LogError($"Reached max Line vertices on frame {Time.frameCount - 1}");
+        }
+        if (m_MaxQuadVerticeReached)
+        {
+            Debug.LogError($"Reached max Quad vertices on frame {Time.frameCount - 1}");
+        }
+
+        m_MaxLineVerticeReached = false;
+        m_MaxQuadVerticeReached = false;
     }
 
 
@@ -144,68 +165,109 @@ public class DebugDrawer : MonoBehaviour
     void BuildLineMesh()
     {
         m_LinesMesh.Clear();
-        m_LinesMesh.SetVertices(m_LineVertices);
-        m_LinesMesh.SetColors(m_LineColors);
-        
-        //TODO : making an array is probably bad perf, profile and change if needed
-        m_LinesMesh.SetIndices(m_LineIndices.ToArray(), MeshTopology.Lines, 0);
+        m_LinesMesh.vertices = m_LineVertices;
+        m_LinesMesh.colors = m_LineColors;
+
+        m_LinesMesh.SetIndices(m_LineIndices, MeshTopology.Lines, 0);
     }
 
     void BuildQuadMesh()
     {
         m_QuadMesh.Clear();
-        m_QuadMesh.SetVertices(m_QuadVertices);
-        m_QuadMesh.SetColors(m_QuadColors);
+        m_QuadMesh.vertices = m_QuadVertices;
+        m_QuadMesh.colors = m_QuadColors;
         
-        //TODO : making an array is probably bad perf, profile and change if needed
-        m_QuadMesh.SetIndices(m_QuadIndices.ToArray(), MeshTopology.Triangles, 0);
+        m_QuadMesh.SetIndices(m_QuadIndices, MeshTopology.Triangles, 0);
     }
 
-    void InternalDrawLine(Vector3 start, Vector3 end, Color color)
+    void InternalDrawLine(Vector3 start, Vector3 end, Color colorStart, Color colorEnd)
     {
-        int startIdx = m_LineVertices.Count;
-        m_LineVertices.Add(start);
-        m_LineVertices.Add(end);
+        if (m_LineVerticeCount + 2 >= m_LineMaxArraySize)
+        {
+            int newMaxSize = m_LineMaxArraySize + k_StartMaxVertices;
+            
+            var newLineVertice = new Vector3[newMaxSize];
+            var newLineColor = new Color[newMaxSize];
+            var newLineIndices = new int[newMaxSize];
+            
+            Array.Copy(m_LineVertices, newLineVertice, m_LineVerticeCount);
+            Array.Copy(m_LineColors, newLineColor, m_LineVerticeCount);
+            Array.Copy(m_LineIndices, newLineIndices, m_LineIndicesCount);
+
+            m_LineMaxArraySize = newMaxSize;
+            m_LineVertices = newLineVertice;
+            m_LineColors = newLineColor;
+            m_LineIndices = newLineIndices;
+        }
         
-        m_LineColors.Add(color);
-        m_LineColors.Add(color);
-        
-        m_LineIndices.Add(startIdx);
-        m_LineIndices.Add(startIdx + 1);
+        m_LineVertices[m_LineVerticeCount] = start;
+        m_LineVertices[m_LineVerticeCount + 1] = end;
+
+        m_LineColors[m_LineVerticeCount] = colorStart;
+        m_LineColors[m_LineVerticeCount + 1] = colorEnd;
+
+        m_LineIndices[m_LineIndicesCount] = m_LineVerticeCount;
+        m_LineIndices[m_LineIndicesCount + 1] = m_LineVerticeCount + 1;
+
+        m_LineVerticeCount += 2;
+        m_LineIndicesCount += 2;
     }
 
     void InternalDrawFilledQuad(Vector3[] corners, Color[] colors)
     {
-        Assert.IsTrue(corners.Length == 4);
-        Assert.IsTrue(colors.Length == 4 || colors.Length == 1);
-
-        int startIdx = m_QuadVertices.Count;
-        m_QuadVertices.AddRange(corners);
-        
-        if(colors.Length == 4)
-            m_QuadColors.AddRange(colors);
-        else
-            m_QuadColors.AddRange(new Color[4] {colors[0], colors[0], colors[0], colors[0]});
-        
-        m_QuadIndices.AddRange(new int[]
+        if (m_QuadIndicesCount + 6 >= m_QuadMaxArraySize)
         {
-            startIdx + 0,
-            startIdx + 1,
-            startIdx + 2,
-            startIdx + 0,
-            startIdx + 2,
-            startIdx + 3,
-        });
+            int newMaxSize = m_QuadMaxArraySize + k_StartMaxVertices;
+            
+            var newQuadVertice = new Vector3[newMaxSize];
+            var newQuadColor = new Color[newMaxSize];
+            var newQuadIndices = new int[newMaxSize];
+            
+            Array.Copy(m_QuadVertices, newQuadVertice, m_QuadVerticeCount);
+            Array.Copy(m_QuadColors, newQuadColor, m_QuadVerticeCount);
+            Array.Copy(m_QuadIndices, newQuadIndices, m_QuadIndicesCount);
+
+            m_QuadMaxArraySize = newMaxSize;
+            m_QuadVertices = newQuadVertice;
+            m_QuadColors = newQuadColor;
+            m_QuadIndices = newQuadIndices;
+        }
+        
+        Assert.IsTrue(corners.Length == 4, "Drawing a quad require 4 corners");
+
+        m_QuadVertices[m_QuadVerticeCount] = corners[0];
+        m_QuadVertices[m_QuadVerticeCount + 1] = corners[1];
+        m_QuadVertices[m_QuadVerticeCount + 2] = corners[2];
+        m_QuadVertices[m_QuadVerticeCount + 3] = corners[3];
+
+        int colorLength = colors.Length;
+        
+        m_QuadColors[m_QuadVerticeCount] = colors[0];
+        m_QuadColors[m_QuadVerticeCount + 1] = colors[ 1 < colorLength - 1 ? 1 : colorLength - 1];
+        m_QuadColors[m_QuadVerticeCount + 1] = colors[ 2 < colorLength - 1 ? 2 : colorLength - 1];
+        m_QuadColors[m_QuadVerticeCount + 1] = colors[ 3 < colorLength - 1 ? 3 : colorLength - 1];
+
+        m_QuadIndices[m_QuadIndicesCount] = m_QuadVerticeCount;
+        m_QuadIndices[m_QuadIndicesCount + 1] = m_QuadVerticeCount + 1;
+        m_QuadIndices[m_QuadIndicesCount + 2] = m_QuadVerticeCount + 2;
+        m_QuadIndices[m_QuadIndicesCount + 3] = m_QuadVerticeCount;
+        m_QuadIndices[m_QuadIndicesCount + 4] = m_QuadVerticeCount + 2;
+        m_QuadIndices[m_QuadIndicesCount + 5] = m_QuadVerticeCount + 3;
+
+        m_QuadVerticeCount += 4;
+        m_QuadIndicesCount += 6;
     }
     
-    void InternalDrawWireQuad(Vector3[] corners, Color color)
+    void InternalDrawWireQuad(Vector3[] corners, Color[] colors)
     {
-        Assert.IsTrue(corners.Length == 4);
+        Assert.IsTrue(corners.Length == 4, "Drawing a wire quad require 4 corners");
         
-        InternalDrawLine(corners[0], corners[1], color);
-        InternalDrawLine(corners[1], corners[2], color);
-        InternalDrawLine(corners[2], corners[3], color);
-        InternalDrawLine(corners[3], corners[0], color);
+        int colorLength = colors.Length;
+        
+        InternalDrawLine(corners[0], corners[1], colors[0],colors[ 1 < colorLength - 1 ? 1 : colorLength - 1]);
+        InternalDrawLine(corners[1], corners[2], colors[ 1 < colorLength - 1 ? 1 : colorLength - 1],colors[ 2 < colorLength - 1 ? 2 : colorLength - 1]);
+        InternalDrawLine(corners[2], corners[3], colors[ 2 < colorLength - 1 ? 2 : colorLength - 1],colors[ 3 < colorLength - 1 ? 3 : colorLength - 1]);
+        InternalDrawLine(corners[3], corners[0], colors[ 3 < colorLength - 1 ? 3 : colorLength - 1],colors[0]);
     }
     
     // ---------- Public Interfaces 
@@ -213,7 +275,13 @@ public class DebugDrawer : MonoBehaviour
     [Conditional("DEVELOPMENT_BUILD"), Conditional("UNITY_EDITOR")]
     public static void DrawLine(Vector3 start, Vector3 end, Color color)
     {
-        s_Instance.InternalDrawLine(start,end,color);
+        s_Instance.InternalDrawLine(start,end,color, color);
+    }
+    
+    [Conditional("DEVELOPMENT_BUILD"), Conditional("UNITY_EDITOR")]
+    public static void DrawLine(Vector3 start, Vector3 end, Color colorStart, Color colorEnd)
+    {
+        s_Instance.InternalDrawLine(start,end,colorStart, colorEnd);
     }
 
     /// <summary>
@@ -234,7 +302,7 @@ public class DebugDrawer : MonoBehaviour
     /// <param name="corners">4 Vector3 that are the 4 corner of the quad</param>
     /// <param name="color">A color for the wire</param>
     [Conditional("DEVELOPMENT_BUILD"), Conditional("UNITY_EDITOR")]
-    public static void DrawWireQuad(Vector3[] corners, Color color)
+    public static void DrawWireQuad(Vector3[] corners, Color[] color)
     { 
         s_Instance.InternalDrawWireQuad(corners, color);
     }
