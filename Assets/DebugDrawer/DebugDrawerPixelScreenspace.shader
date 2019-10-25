@@ -1,4 +1,4 @@
-﻿Shader "Hidden/DebugDrawerShader"
+﻿Shader "Unlit/DebugDrawerPixelScreenspace"
 {
     Properties
     {
@@ -16,6 +16,8 @@
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            
+            #pragma multi_compile PIXEL_COORD __
 
             #include "UnityCG.cginc"
 
@@ -39,17 +41,30 @@
             v2f vert (appdata v)
             {
                 v2f o;
-                o.vertex = UnityObjectToClipPos(v.vertex);
+                
+                
+                //set depth to a bit in front of near plane
+                o.vertex.z = 0.1f;
+                #if PIXEL_COORD
+                o.vertex.x = -1.0f + v.vertex.x/_ScreenParams.x * 2.0f;
+                o.vertex.y = -1.0f + v.vertex.y/_ScreenParams.y * 2.0f;
+                #else
+                o.vertex.x = -1.0f + v.vertex.x * 2.0f;
+                o.vertex.y = -1.0f + v.vertex.y * 2.0f;
+                #endif
+                
+                o.vertex.w = 1.0f;
+                
                 o.vcol = v.vcol;
+                
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
-
                 return o;
             }
 
             fixed4 frag (v2f i) : SV_Target
             {
+                // sample the texture
                 fixed4 col = tex2D(_MainTex, i.uv) * i.vcol;
-
                 return col;
             }
             ENDCG

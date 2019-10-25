@@ -8,7 +8,7 @@ public class TestScript : MonoBehaviour
 {
     float timer = 0;
 
-    int count = 10000;
+    int count = 50;
     
     Vector3[] randomPoints;
     Color[] randomColor;
@@ -32,11 +32,33 @@ public class TestScript : MonoBehaviour
             timer = 0;
             PickNewPoint();
         }
+        
+        DebugDrawer.DrawPixelScreenQuad(new Vector3[]
+        {
+            new Vector3(10,10, 0),
+            new Vector3(300, 10, 0),
+            new Vector3( 500, 500, 0),
+            new Vector3( 10, 300, 0) 
+        }, new Color[]
+        {
+            Color.red, Color.green, Color.blue, Color.yellow 
+        });
+        
+        DebugDrawer.DrawNormalizedScreenQuad(new Vector3[]
+        {
+            new Vector3(0.8f,0.8f, 0),
+            new Vector3(0.8f, 0.9f, 0),
+            new Vector3( 0.9f, 0.9f, 0),
+            new Vector3( 0.9f, 0.8f, 0) 
+        }, new Color[]
+        {
+            Color.green, Color.green, Color.blue, Color.blue 
+        });
 
         for (int i = 0; i < count; ++i)
         {
-            DebugDrawer.DrawLine(randomPoints[i*2+0], randomPoints[i*2+1], randomColor[i]);
-            DebugDrawer.DrawFilledQuad(randomPointQuad[i], randomColorQuad[i]);
+            //DebugDrawer.DrawLine(randomPoints[i*2+0], randomPoints[i*2+1], randomColor[i]);
+            //DebugDrawer.DrawFilledQuad(randomPointQuad[i], randomColorQuad[i]);
         }
     }
 
@@ -65,10 +87,10 @@ public class TestScript : MonoBehaviour
             randomPointQuad[i][2] = Random.insideUnitSphere * range;
             randomPointQuad[i][3] = Random.insideUnitSphere * range;
             
-            randomColorQuad[i][0] = Random.ColorHSV();
-            randomColorQuad[i][1] = Random.ColorHSV();
-            randomColorQuad[i][2] = Random.ColorHSV();
-            randomColorQuad[i][3] = Random.ColorHSV();
+            randomColorQuad[i][0] = Random.ColorHSV(0,1,0,1,0,1,1,1);
+            randomColorQuad[i][1] = Random.ColorHSV(0,1,0,1,0,1,1,1);
+            randomColorQuad[i][2] = Random.ColorHSV(0,1,0,1,0,1,1,1);
+            randomColorQuad[i][3] = Random.ColorHSV(0,1,0,1,0,1,1,1);
         }
     }
 }
