@@ -55,11 +55,13 @@ public class TestScript : MonoBehaviour
 //            Color.green, Color.green, Color.blue, Color.blue 
 //        });
 
-        for (int i = 0; i < count; ++i)
-        {
-            DebugDrawer.DrawLine(randomPoints[i*2+0], randomPoints[i*2+1], randomColor[i]);
-            DebugDrawer.DrawFilledQuad(randomPointQuad[i], randomColorQuad[i]);
-        }
+        DebugDrawer.DrawTextScreenSpace(new Vector3(253, 253, 0), Color.white, "What is DAT SHAITE");
+
+//        for (int i = 0; i < count; ++i)
+//        {
+//            DebugDrawer.DrawLine(randomPoints[i*2+0], randomPoints[i*2+1], randomColor[i]);
+//            DebugDrawer.DrawFilledQuad(randomPointQuad[i], randomColorQuad[i]);
+//        }
     }
 
     void PickNewPoint()
