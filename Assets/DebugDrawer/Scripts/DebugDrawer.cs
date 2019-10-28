@@ -15,24 +15,14 @@ public class DebugDrawer : MonoBehaviour
     
     static DebugDrawer s_Instance;
     
-    CommandBuffer buffer;
+    CommandBuffer m_Buffer;
 
-    // == Line rendering
-    int m_LineMaxArraySize = k_StartMaxVertices;
-    //TODO : Maybe can merge vertices and indices count for lines, as we never reuse vertices?
-    int m_LineVerticeCount = 0;
-    Vector3[] m_LineVertices = new Vector3[k_StartMaxVertices];
-    Color[] m_LineColors = new Color[k_StartMaxVertices];
-    int m_LineIndicesCount = 0;
-    int[] m_LineIndices = new int[k_StartMaxVertices];
-    
-    Mesh m_LinesMesh;
-    Material m_DebugMaterial;
+    DebugLineRenderer m_WorldSpaceDebugLineRenderer;
 
-    QuadRenderer m_WorldSpaceQuadsRenderer;
+    DebugQuadRenderer m_WorldSpaceDebugQuadsRenderer;
     
-    QuadRenderer m_PixelScreenSpaceQuadRenderer;
-    QuadRenderer m_NormalizedScreenSpaceQuadRenderer;
+    DebugQuadRenderer m_PixelScreenSpaceDebugQuadRenderer;
+    DebugQuadRenderer m_NormalizedScreenSpaceDebugQuadRenderer;
     
     bool m_RuntimeToggle = true;
 
@@ -59,7 +49,7 @@ public class DebugDrawer : MonoBehaviour
         //we clean all vertice list in the init phase of the player loop, so any subsequent update will push to clean list
         UpdateLoopForCleanup();
         
-        m_DebugMaterial = new Material(Shader.Find("Hidden/DebugDrawerShader"));
+        Material debugMat = new Material(Shader.Find("Hidden/DebugDrawerShader"));
 
         if (GraphicsSettings.renderPipelineAsset != null)
         {
@@ -70,20 +60,19 @@ public class DebugDrawer : MonoBehaviour
             Camera.onPostRender += RenderDebug;
         }
         
-        buffer = new CommandBuffer();
-        buffer.name = "DebugDrawing";
-
-        m_LinesMesh = new Mesh();
-        m_LinesMesh.MarkDynamic();
+        m_Buffer = new CommandBuffer();
+        m_Buffer.name = "DebugDrawing";
 
         Material pixelCoordMat = new Material(Shader.Find("Unlit/DebugDrawerPixelScreenspace"));
         pixelCoordMat.EnableKeyword("PIXEL_COORD");
         
         Material normalizedCoordMat = new Material(Shader.Find("Unlit/DebugDrawerPixelScreenspace"));
         
-        m_WorldSpaceQuadsRenderer = new QuadRenderer(m_DebugMaterial);
-        m_PixelScreenSpaceQuadRenderer = new QuadRenderer(pixelCoordMat);
-        m_NormalizedScreenSpaceQuadRenderer = new QuadRenderer(normalizedCoordMat);
+        m_WorldSpaceDebugLineRenderer = new DebugLineRenderer(debugMat);
+        
+        m_WorldSpaceDebugQuadsRenderer = new DebugQuadRenderer(debugMat);
+        m_PixelScreenSpaceDebugQuadRenderer = new DebugQuadRenderer(pixelCoordMat);
+        m_NormalizedScreenSpaceDebugQuadRenderer = new DebugQuadRenderer(normalizedCoordMat);
     }
 
     //will only be called on game stop as the object is tagged as don't destroy on load
@@ -139,12 +128,11 @@ public class DebugDrawer : MonoBehaviour
 
     void CleanupPostFrame()
     {
-        m_LineVerticeCount = 0;
-        m_LineIndicesCount = 0;
-
-        m_WorldSpaceQuadsRenderer.Clear();
-        m_PixelScreenSpaceQuadRenderer.Clear();
-        m_NormalizedScreenSpaceQuadRenderer.Clear();
+        m_WorldSpaceDebugLineRenderer.Clear();
+        
+        m_WorldSpaceDebugQuadsRenderer.Clear();
+        m_PixelScreenSpaceDebugQuadRenderer.Clear();
+        m_NormalizedScreenSpaceDebugQuadRenderer.Clear();
     }
 
 
@@ -153,68 +141,32 @@ public class DebugDrawer : MonoBehaviour
         if(!m_RuntimeToggle)
             return;
 
-        BuildLineMesh();
+        m_WorldSpaceDebugLineRenderer.BuildMesh();
         
-        m_WorldSpaceQuadsRenderer.BuildQuadMesh();
-        m_PixelScreenSpaceQuadRenderer.BuildQuadMesh();
-        m_NormalizedScreenSpaceQuadRenderer.BuildQuadMesh();
+        m_WorldSpaceDebugQuadsRenderer.BuildMesh();
+        m_PixelScreenSpaceDebugQuadRenderer.BuildMesh();
+        m_NormalizedScreenSpaceDebugQuadRenderer.BuildMesh();
         
-        buffer.Clear();
-        buffer.ClearRenderTarget(true, false, Color.black);
-        buffer.SetViewProjectionMatrices(cam.worldToCameraMatrix, cam.projectionMatrix);
+        m_Buffer.Clear();
+        m_Buffer.ClearRenderTarget(true, false, Color.black);
+        m_Buffer.SetViewProjectionMatrices(cam.worldToCameraMatrix, cam.projectionMatrix);
         
-        buffer.DrawMesh(m_LinesMesh, Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one), m_DebugMaterial);
-        buffer.DrawMesh(m_WorldSpaceQuadsRenderer.mesh, Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one), m_WorldSpaceQuadsRenderer.material);
-        buffer.DrawMesh(m_PixelScreenSpaceQuadRenderer.mesh, Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one), m_PixelScreenSpaceQuadRenderer.material);
-        buffer.DrawMesh(m_NormalizedScreenSpaceQuadRenderer.mesh,  Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one), m_NormalizedScreenSpaceQuadRenderer.material);
+        m_Buffer.DrawMesh(m_WorldSpaceDebugLineRenderer.Mesh, Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one), m_WorldSpaceDebugLineRenderer.Material);
+        m_Buffer.DrawMesh(m_WorldSpaceDebugQuadsRenderer.Mesh, Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one), m_WorldSpaceDebugQuadsRenderer.Material);
+        m_Buffer.DrawMesh(m_PixelScreenSpaceDebugQuadRenderer.Mesh, Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one), m_PixelScreenSpaceDebugQuadRenderer.Material);
+        m_Buffer.DrawMesh(m_NormalizedScreenSpaceDebugQuadRenderer.Mesh,  Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one), m_NormalizedScreenSpaceDebugQuadRenderer.Material);
         
-        Graphics.ExecuteCommandBuffer(buffer);
+        Graphics.ExecuteCommandBuffer(m_Buffer);
     }
 
-    void BuildLineMesh()
-    {
-        m_LinesMesh.Clear();
-        m_LinesMesh.vertices = m_LineVertices;
-        m_LinesMesh.colors = m_LineColors;
-
-        m_LinesMesh.SetIndices(m_LineIndices, MeshTopology.Lines, 0);
-    }
-    
 
     void InternalDrawLine(Vector3 start, Vector3 end, Color colorStart, Color colorEnd)
     {
         if(!m_RuntimeToggle)
             return;
 
-        if (m_LineVerticeCount + 2 >= m_LineMaxArraySize)
-        {
-            int newMaxSize = m_LineMaxArraySize + k_StartMaxVertices;
-            
-            var newLineVertice = new Vector3[newMaxSize];
-            var newLineColor = new Color[newMaxSize];
-            var newLineIndices = new int[newMaxSize];
-            
-            Array.Copy(m_LineVertices, newLineVertice, m_LineVerticeCount);
-            Array.Copy(m_LineColors, newLineColor, m_LineVerticeCount);
-            Array.Copy(m_LineIndices, newLineIndices, m_LineIndicesCount);
-
-            m_LineMaxArraySize = newMaxSize;
-            m_LineVertices = newLineVertice;
-            m_LineColors = newLineColor;
-            m_LineIndices = newLineIndices;
-        }
+        m_WorldSpaceDebugLineRenderer.PushNewLine(start, end, colorStart, colorEnd);
         
-        m_LineVertices[m_LineVerticeCount] = start;
-        m_LineVertices[m_LineVerticeCount + 1] = end;
-
-        m_LineColors[m_LineVerticeCount] = colorStart;
-        m_LineColors[m_LineVerticeCount + 1] = colorEnd;
-
-        m_LineIndices[m_LineIndicesCount] = m_LineVerticeCount;
-        m_LineIndices[m_LineIndicesCount + 1] = m_LineVerticeCount + 1;
-
-        m_LineVerticeCount += 2;
-        m_LineIndicesCount += 2;
     }
 
     void InternalDrawFilledQuad(Vector3[] corners, Color[] colors)
@@ -222,7 +174,7 @@ public class DebugDrawer : MonoBehaviour
         if(!m_RuntimeToggle)
             return;
         
-        m_WorldSpaceQuadsRenderer.PushNewQuad(corners, colors);
+        m_WorldSpaceDebugQuadsRenderer.PushNewQuad(corners, colors);
     }
     
     void InternalDrawWireQuad(Vector3[] corners, Color[] colors)
@@ -232,10 +184,10 @@ public class DebugDrawer : MonoBehaviour
         
         int colorLength = colors.Length;
         
-        InternalDrawLine(corners[0], corners[1], colors[0],colors[ 1 < colorLength - 1 ? 1 : colorLength - 1]);
-        InternalDrawLine(corners[1], corners[2], colors[ 1 < colorLength - 1 ? 1 : colorLength - 1],colors[ 2 < colorLength - 1 ? 2 : colorLength - 1]);
-        InternalDrawLine(corners[2], corners[3], colors[ 2 < colorLength - 1 ? 2 : colorLength - 1],colors[ 3 < colorLength - 1 ? 3 : colorLength - 1]);
-        InternalDrawLine(corners[3], corners[0], colors[ 3 < colorLength - 1 ? 3 : colorLength - 1],colors[0]);
+        m_WorldSpaceDebugLineRenderer.PushNewLine(corners[0], corners[1], colors[0],colors[ 1 < colorLength - 1 ? 1 : colorLength - 1]);
+        m_WorldSpaceDebugLineRenderer.PushNewLine(corners[1], corners[2], colors[ 1 < colorLength - 1 ? 1 : colorLength - 1],colors[ 2 < colorLength - 1 ? 2 : colorLength - 1]);
+        m_WorldSpaceDebugLineRenderer.PushNewLine(corners[2], corners[3], colors[ 2 < colorLength - 1 ? 2 : colorLength - 1],colors[ 3 < colorLength - 1 ? 3 : colorLength - 1]);
+        m_WorldSpaceDebugLineRenderer.PushNewLine(corners[3], corners[0], colors[ 3 < colorLength - 1 ? 3 : colorLength - 1],colors[0]);
     }
 
     void InternalDrawFilledQuadPixelCoord(Vector3[] corners, Color[] colors)
@@ -243,7 +195,7 @@ public class DebugDrawer : MonoBehaviour
         if(!m_RuntimeToggle)
             return;
         
-        m_PixelScreenSpaceQuadRenderer.PushNewQuad(corners, colors);
+        m_PixelScreenSpaceDebugQuadRenderer.PushNewQuad(corners, colors);
     }
     
     void InternalDrawFilledQuadNormalizedCoord(Vector3[] corners, Color[] colors)
@@ -251,7 +203,7 @@ public class DebugDrawer : MonoBehaviour
         if(!m_RuntimeToggle)
             return;
         
-        m_NormalizedScreenSpaceQuadRenderer.PushNewQuad(corners, colors);
+        m_NormalizedScreenSpaceDebugQuadRenderer.PushNewQuad(corners, colors);
     }
     
     // ---------- Public Interfaces 
@@ -305,86 +257,140 @@ public class DebugDrawer : MonoBehaviour
     }
 }
 
-public class QuadRenderer
+public abstract class DebugGeometryRenderer
 {
-    const int k_StartMaxVertices = UInt16.MaxValue;
+    protected const int k_StartMaxVertices = UInt16.MaxValue;
 
-    public Mesh mesh => m_QuadMesh;
-    public Material material => m_DebugMaterial;
+    public Mesh Mesh => m_Mesh;
+    public Material Material => m_DebugMaterial;
     
-    int m_QuadMaxArraySize = k_StartMaxVertices;
-    int m_QuadVerticeCount = 0;
-    Vector3[] m_QuadVertices = new Vector3[k_StartMaxVertices];
-    Color[] m_QuadColors = new Color[k_StartMaxVertices];
-    int m_QuadIndicesCount = 0;
-    int[] m_QuadIndices = new int[k_StartMaxVertices];
+    protected int m_MaxArraySize = k_StartMaxVertices;
+    protected int m_VerticeCount = 0;
+    protected Vector3[] m_Vertices = new Vector3[k_StartMaxVertices];
+    protected Color[] m_Colors = new Color[k_StartMaxVertices];
+    protected int m_IndicesCount = 0;
+    protected int[] m_Indices = new int[k_StartMaxVertices];
     
-    Mesh m_QuadMesh;
-    Material m_DebugMaterial;
-
-    public QuadRenderer(Material materialUsed)
+        
+    protected Mesh m_Mesh;
+    protected Material m_DebugMaterial;
+    
+    public DebugGeometryRenderer(Material materialUsed)
     {
-        m_QuadMesh = new Mesh();
-        m_QuadMesh.MarkDynamic();
+        m_Mesh = new Mesh();
+        m_Mesh.MarkDynamic();
 
         m_DebugMaterial = materialUsed;
     }
-
+    
     public void Clear()
     {
-        m_QuadIndicesCount = 0;
-        m_QuadVerticeCount = 0;
+        m_IndicesCount = 0;
+        m_VerticeCount = 0;
     }
-    
-    public void BuildQuadMesh()
+
+    public void BuildMesh()
     {
-        m_QuadMesh.Clear();
-        m_QuadMesh.vertices = m_QuadVertices;
-        m_QuadMesh.colors = m_QuadColors;
+        InternalBuildMesh();
+    }
+
+    protected abstract void InternalBuildMesh();
+
+    protected void IncreaseArraySize()
+    {
+        int newMaxSize = m_MaxArraySize + k_StartMaxVertices;
+            
+        var newQuadVertice = new Vector3[newMaxSize];
+        var newQuadColor = new Color[newMaxSize];
+        var newQuadIndices = new int[newMaxSize];
+            
+        Array.Copy(m_Vertices, newQuadVertice, m_VerticeCount);
+        Array.Copy(m_Colors, newQuadColor, m_VerticeCount);
+        Array.Copy(m_Indices, newQuadIndices, m_IndicesCount);
+
+        m_MaxArraySize = newMaxSize;
+        m_Vertices = newQuadVertice;
+        m_Colors = newQuadColor;
+        m_Indices = newQuadIndices;
+    }
+}
+
+public class DebugLineRenderer : DebugGeometryRenderer
+{
+    public DebugLineRenderer(Material mat)
+        : base(mat) { }
+    
+    protected override void InternalBuildMesh()
+    {
+        m_Mesh.Clear();
+        m_Mesh.vertices = m_Vertices;
+        m_Mesh.colors = m_Colors;
         
-        m_QuadMesh.SetIndices(m_QuadIndices, MeshTopology.Triangles, 0);
+        m_Mesh.SetIndices(m_Indices, MeshTopology.Lines, 0);
+    }
+
+    public void PushNewLine(Vector3 start, Vector3 end, Color colorStart, Color colorEnd)
+    {
+        if (m_IndicesCount + 6 >= m_MaxArraySize)
+        {
+            IncreaseArraySize();
+        }
+        
+        m_Vertices[m_VerticeCount] = start;
+        m_Vertices[m_VerticeCount + 1] = end;
+
+        m_Colors[m_VerticeCount] = colorStart;
+        m_Colors[m_VerticeCount + 1] = colorEnd;
+
+        m_Indices[m_IndicesCount] = m_VerticeCount;
+        m_Indices[m_IndicesCount + 1] = m_VerticeCount + 1;
+
+        m_VerticeCount += 2;
+        m_IndicesCount += 2;
+    }
+}
+
+public class DebugQuadRenderer : DebugGeometryRenderer
+{
+    public DebugQuadRenderer(Material mat)
+        : base(mat) { }
+
+    protected override void InternalBuildMesh()
+    {
+        m_Mesh.Clear();
+        m_Mesh.vertices = m_Vertices;
+        m_Mesh.colors = m_Colors;
+        
+        m_Mesh.SetIndices(m_Indices, MeshTopology.Triangles, 0);
     }
     
     public void PushNewQuad(Vector3[] corners, Color[] colors)
     {
-        if (m_QuadIndicesCount + 6 >= m_QuadMaxArraySize)
+        if (m_IndicesCount + 6 >= m_MaxArraySize)
         {
-            int newMaxSize = m_QuadMaxArraySize + k_StartMaxVertices;
-            
-            var newQuadVertice = new Vector3[newMaxSize];
-            var newQuadColor = new Color[newMaxSize];
-            var newQuadIndices = new int[newMaxSize];
-            
-            Array.Copy(m_QuadVertices, newQuadVertice, m_QuadVerticeCount);
-            Array.Copy(m_QuadColors, newQuadColor, m_QuadVerticeCount);
-            Array.Copy(m_QuadIndices, newQuadIndices, m_QuadIndicesCount);
-
-            m_QuadMaxArraySize = newMaxSize;
-            m_QuadVertices = newQuadVertice;
-            m_QuadColors = newQuadColor;
-            m_QuadIndices = newQuadIndices;
+            IncreaseArraySize();
         }
         
-        m_QuadVertices[m_QuadVerticeCount] = corners[0];
-        m_QuadVertices[m_QuadVerticeCount + 1] = corners[1];
-        m_QuadVertices[m_QuadVerticeCount + 2] = corners[2];
-        m_QuadVertices[m_QuadVerticeCount + 3] = corners[3];
+        m_Vertices[m_VerticeCount] = corners[0];
+        m_Vertices[m_VerticeCount + 1] = corners[1];
+        m_Vertices[m_VerticeCount + 2] = corners[2];
+        m_Vertices[m_VerticeCount + 3] = corners[3];
 
         int colorLength = colors.Length;
         
-        m_QuadColors[m_QuadVerticeCount] = colors[0];
-        m_QuadColors[m_QuadVerticeCount + 1] = colors[ 1 < colorLength - 1 ? 1 : colorLength - 1];
-        m_QuadColors[m_QuadVerticeCount + 2] = colors[ 2 < colorLength - 1 ? 2 : colorLength - 1];
-        m_QuadColors[m_QuadVerticeCount + 3] = colors[ 3 < colorLength - 1 ? 3 : colorLength - 1];
+        m_Colors[m_VerticeCount] = colors[0];
+        m_Colors[m_VerticeCount + 1] = colors[ 1 < colorLength - 1 ? 1 : colorLength - 1];
+        m_Colors[m_VerticeCount + 2] = colors[ 2 < colorLength - 1 ? 2 : colorLength - 1];
+        m_Colors[m_VerticeCount + 3] = colors[ 3 < colorLength - 1 ? 3 : colorLength - 1];
 
-        m_QuadIndices[m_QuadIndicesCount] = m_QuadVerticeCount;
-        m_QuadIndices[m_QuadIndicesCount + 1] = m_QuadVerticeCount + 1;
-        m_QuadIndices[m_QuadIndicesCount + 2] = m_QuadVerticeCount + 2;
-        m_QuadIndices[m_QuadIndicesCount + 3] = m_QuadVerticeCount;
-        m_QuadIndices[m_QuadIndicesCount + 4] = m_QuadVerticeCount + 2;
-        m_QuadIndices[m_QuadIndicesCount + 5] = m_QuadVerticeCount + 3;
+        m_Indices[m_IndicesCount] = m_VerticeCount;
+        m_Indices[m_IndicesCount + 1] = m_VerticeCount + 1;
+        m_Indices[m_IndicesCount + 2] = m_VerticeCount + 2;
+        m_Indices[m_IndicesCount + 3] = m_VerticeCount;
+        m_Indices[m_IndicesCount + 4] = m_VerticeCount + 2;
+        m_Indices[m_IndicesCount + 5] = m_VerticeCount + 3;
 
-        m_QuadVerticeCount += 4;
-        m_QuadIndicesCount += 6;
+        m_VerticeCount += 4;
+        m_IndicesCount += 6;
     }
 }

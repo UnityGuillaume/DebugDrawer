@@ -33,32 +33,32 @@ public class TestScript : MonoBehaviour
             PickNewPoint();
         }
         
-        DebugDrawer.DrawPixelScreenQuad(new Vector3[]
-        {
-            new Vector3(10,10, 0),
-            new Vector3(300, 10, 0),
-            new Vector3( 500, 500, 0),
-            new Vector3( 10, 300, 0) 
-        }, new Color[]
-        {
-            Color.red, Color.green, Color.blue, Color.yellow 
-        });
-        
-        DebugDrawer.DrawNormalizedScreenQuad(new Vector3[]
-        {
-            new Vector3(0.8f,0.8f, 0),
-            new Vector3(0.8f, 0.9f, 0),
-            new Vector3( 0.9f, 0.9f, 0),
-            new Vector3( 0.9f, 0.8f, 0) 
-        }, new Color[]
-        {
-            Color.green, Color.green, Color.blue, Color.blue 
-        });
+//        DebugDrawer.DrawPixelScreenQuad(new Vector3[]
+//        {
+//            new Vector3(10,10, 0),
+//            new Vector3(300, 10, 0),
+//            new Vector3( 500, 500, 0),
+//            new Vector3( 10, 300, 0) 
+//        }, new Color[]
+//        {
+//            Color.red, Color.green, Color.blue, Color.yellow 
+//        });
+//        
+//        DebugDrawer.DrawNormalizedScreenQuad(new Vector3[]
+//        {
+//            new Vector3(0.8f,0.8f, 0),
+//            new Vector3(0.8f, 0.9f, 0),
+//            new Vector3( 0.9f, 0.9f, 0),
+//            new Vector3( 0.9f, 0.8f, 0) 
+//        }, new Color[]
+//        {
+//            Color.green, Color.green, Color.blue, Color.blue 
+//        });
 
         for (int i = 0; i < count; ++i)
         {
-            //DebugDrawer.DrawLine(randomPoints[i*2+0], randomPoints[i*2+1], randomColor[i]);
-            //DebugDrawer.DrawFilledQuad(randomPointQuad[i], randomColorQuad[i]);
+            DebugDrawer.DrawLine(randomPoints[i*2+0], randomPoints[i*2+1], randomColor[i]);
+            DebugDrawer.DrawFilledQuad(randomPointQuad[i], randomColorQuad[i]);
         }
     }
 
