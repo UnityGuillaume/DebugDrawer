@@ -55,7 +55,8 @@ public class TestScript : MonoBehaviour
 //            Color.green, Color.green, Color.blue, Color.blue 
 //        });
 
-        DebugDrawer.DrawTextScreenSpace(new Vector3(253, 253, 0), Color.white, "What is DAT SHAITE");
+        for(int i = 0; i < 300; ++i)
+            DebugDrawer.DrawTextScreenSpace(new Vector3(Random.Range(200, Screen.width - 200), Random.Range(200, Screen.height - 200), 0), Random.ColorHSV(), "This IS a TEST string");
 
 //        for (int i = 0; i < count; ++i)
 //        {

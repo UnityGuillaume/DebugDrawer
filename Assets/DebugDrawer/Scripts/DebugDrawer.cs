@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Diagnostics;
 using UnityEngine;
 using UnityEngine.Assertions;
@@ -28,6 +29,10 @@ public class DebugDrawer : MonoBehaviour
     DebugTextDrawer m_ScreenSpaceTextRenderer;
 
     Font m_DefaultFont;
+    TextGenerationSettings m_CachedTextGenerationSettings;
+    TextGenerator m_CachedGenerator = new TextGenerator(2000);
+    
+    List<UIVertex> m_UIVertexCache = new List<UIVertex>(65535);
     
     bool m_RuntimeToggle = true;
 
@@ -85,8 +90,21 @@ public class DebugDrawer : MonoBehaviour
         
         Material textRenderingMaterialScreen = new Material(screenspaceShader);
         textRenderingMaterialScreen.mainTexture = m_DefaultFont.material.mainTexture;
+        textRenderingMaterialScreen.EnableKeyword("PIXEL_COORD");
         
         m_ScreenSpaceTextRenderer = new DebugTextDrawer(textRenderingMaterialScreen);
+        
+        m_CachedTextGenerationSettings = new TextGenerationSettings();
+        m_CachedTextGenerationSettings.textAnchor = TextAnchor.MiddleCenter;
+        m_CachedTextGenerationSettings.generationExtents = new Vector2(500.0F, 200.0F);
+        m_CachedTextGenerationSettings.pivot = Vector2.one * 0.5f;
+        m_CachedTextGenerationSettings.richText = false;
+        m_CachedTextGenerationSettings.font = m_DefaultFont;
+        m_CachedTextGenerationSettings.fontSize = 32;
+        m_CachedTextGenerationSettings.fontStyle = FontStyle.Normal;
+        m_CachedTextGenerationSettings.verticalOverflow = VerticalWrapMode.Overflow;
+        m_CachedTextGenerationSettings.resizeTextForBestFit = true;
+        m_CachedTextGenerationSettings.scaleFactor = 1;
     }
 
     //will only be called on game stop as the object is tagged as don't destroy on load
@@ -147,6 +165,8 @@ public class DebugDrawer : MonoBehaviour
         m_WorldSpaceDebugQuadsRenderer.Clear();
         m_PixelScreenSpaceDebugQuadRenderer.Clear();
         m_NormalizedScreenSpaceDebugQuadRenderer.Clear();
+
+        m_ScreenSpaceTextRenderer.Clear();
     }
 
 
@@ -225,25 +245,12 @@ public class DebugDrawer : MonoBehaviour
 
     void InternalPushText(Vector3 position, Color color, string text)
     {
-        Text
-        TextGenerationSettings settings = new TextGenerationSettings();
-        settings.textAnchor = TextAnchor.MiddleCenter;
-        settings.color = Color.red;
-        settings.generationExtents = new Vector2(500.0F, 200.0F);
-        settings.pivot = position;
-        settings.richText = false;
-        settings.font = m_DefaultFont;
-        settings.fontSize = 32;
-        settings.fontStyle = FontStyle.Normal;
-        settings.verticalOverflow = VerticalWrapMode.Overflow;
+        m_CachedTextGenerationSettings.color = color;
+        m_CachedGenerator.PopulateWithErrors(text, m_CachedTextGenerationSettings, s_Instance.gameObject);
         
-        TextGenerator generator = new TextGenerator(text.Length);
-        generator.PopulateWithErrors(text, settings, s_Instance.gameObject);
+        m_CachedGenerator.GetVertices(m_UIVertexCache);
         
-        Debug.Log($"Generate {generator.vertexCount} vertices");
-        
-        var vertices = generator.GetVerticesArray();
-        m_ScreenSpaceTextRenderer.PushNewCharVertices(vertices, Vector3.zero);
+        m_ScreenSpaceTextRenderer.PushNewCharVertices(m_UIVertexCache, position);
     }
     
     // ---------- Public Interfaces 
@@ -299,7 +306,6 @@ public class DebugDrawer : MonoBehaviour
     [Conditional("DEVELOPMENT_BUILD"), Conditional("UNITY_EDITOR")]
     public static void DrawTextScreenSpace(Vector3 position, Color color, string text)
     {
-       
         s_Instance.InternalPushText(position, color, text);
     }
 }
@@ -486,29 +492,36 @@ public class DebugTextDrawer : DebugGeometryRenderer
         m_Mesh.SetIndices(m_Indices, MeshTopology.Triangles, 0);
     }
 
-    public void PushNewCharVertices(UIVertex[] vertices, Vector3 offset)
+    public void PushNewCharVertices(IList<UIVertex> vertices, Vector3 offset)
     {
-        while(vertices.Length * 2 > m_MaxArraySize)
+        while(m_IndicesCount + (vertices.Count / 4 * 6) > m_MaxArraySize)
             IncreaseArraySize();
-        
-        for (int i = 0; i < vertices.Length; ++i)
+
+        int indiceCount = 0;
+
+        for (int i = 0; i < vertices.Count; ++i)
         {
             m_Vertices[m_VerticeCount + i] = vertices[i].position + offset;
             m_UV[m_VerticeCount + i] = vertices[i].uv0;
             m_Colors[m_VerticeCount + i] = vertices[i].color;
             
-            if(i != 0 && i % 3 == 0)
+            if(i % 4 == 0)
             {
-                int startIdx = i / 3 - 1;
+                int startIdx = i / 4;
                 
                 m_Indices[m_IndicesCount + startIdx * 6 + 0] = m_VerticeCount + i + 0;
                 m_Indices[m_IndicesCount + startIdx * 6 + 1] = m_VerticeCount + i + 1;
                 m_Indices[m_IndicesCount + startIdx * 6 + 2] = m_VerticeCount + i + 2;
-
+                
                 m_Indices[m_IndicesCount + startIdx * 6 + 3] = m_VerticeCount + i + 0;
                 m_Indices[m_IndicesCount + startIdx * 6 + 4] = m_VerticeCount + i + 2;
                 m_Indices[m_IndicesCount + startIdx * 6 + 5] = m_VerticeCount + i + 3;
+
+                indiceCount += 6;
             }
         }
+
+        m_VerticeCount += vertices.Count;
+        m_IndicesCount += indiceCount;
     }
 }
