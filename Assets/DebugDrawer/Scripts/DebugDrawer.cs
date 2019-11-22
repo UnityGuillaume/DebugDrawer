@@ -304,7 +304,7 @@ public class DebugDrawer : MonoBehaviour
     }
 
     [Conditional("DEVELOPMENT_BUILD"), Conditional("UNITY_EDITOR")]
-    public static void DrawTextScreenSpace(Vector3 position, Color color, string text)
+    public static void DrawTextPixelScreen(Vector3 position, Color color, string text)
     {
         s_Instance.InternalPushText(position, color, text);
     }
@@ -321,7 +321,7 @@ public abstract class DebugGeometryRenderer
     protected int m_VerticeCount = 0;
     protected Vector3[] m_Vertices = new Vector3[k_StartMaxVertices];
     protected Vector2[] m_UV = null;
-    protected Color[] m_Colors = new Color[k_StartMaxVertices];
+    protected Color32[] m_Colors = new Color32[k_StartMaxVertices];
     protected int m_IndicesCount = 0;
     protected int[] m_Indices = new int[k_StartMaxVertices];
     
@@ -376,7 +376,7 @@ public abstract class DebugGeometryRenderer
         int newMaxSize = m_MaxArraySize + k_StartMaxVertices;
             
         var newQuadVertice = new Vector3[newMaxSize];
-        var newQuadColor = new Color[newMaxSize];
+        var newQuadColor = new Color32[newMaxSize];
         var newQuadIndices = new int[newMaxSize];
 
         Array.Copy(m_Vertices, newQuadVertice, m_VerticeCount);
@@ -406,7 +406,7 @@ public class DebugLineRenderer : DebugGeometryRenderer
     {
         m_Mesh.Clear();
         m_Mesh.vertices = m_Vertices;
-        m_Mesh.colors = m_Colors;
+        m_Mesh.colors32 = m_Colors;
         
         m_Mesh.SetIndices(m_Indices, MeshTopology.Lines, 0);
     }
@@ -441,7 +441,7 @@ public class DebugQuadRenderer : DebugGeometryRenderer
     {
         m_Mesh.Clear();
         m_Mesh.vertices = m_Vertices;
-        m_Mesh.colors = m_Colors;
+        m_Mesh.colors32 = m_Colors;
         
         m_Mesh.SetIndices(m_Indices, MeshTopology.Triangles, 0);
     }
@@ -487,23 +487,29 @@ public class DebugTextDrawer : DebugGeometryRenderer
         m_Mesh.Clear();
         m_Mesh.vertices = m_Vertices;
         m_Mesh.uv = m_UV;
-        m_Mesh.colors = m_Colors;
+        m_Mesh.colors32 = m_Colors;
 
         m_Mesh.SetIndices(m_Indices, MeshTopology.Triangles, 0);
     }
 
     public void PushNewCharVertices(IList<UIVertex> vertices, Vector3 offset)
     {
-        while(m_IndicesCount + (vertices.Count / 4 * 6) > m_MaxArraySize)
+        int vertCount = vertices.Count;
+        
+        while(m_IndicesCount + (vertCount / 4 * 6) > m_MaxArraySize)
             IncreaseArraySize();
 
         int indiceCount = 0;
+        UIVertex vertex = new UIVertex();
+        Vector3 test = new Vector3(10,1,0);
 
-        for (int i = 0; i < vertices.Count; ++i)
+        for (int i = 0; i < vertCount; ++i)
         {
-            m_Vertices[m_VerticeCount + i] = vertices[i].position + offset;
-            m_UV[m_VerticeCount + i] = vertices[i].uv0;
-            m_Colors[m_VerticeCount + i] = vertices[i].color;
+            UIVertex vert = vertices[i];
+
+            m_Vertices[m_VerticeCount + i] = vert.position + offset;
+            m_UV[m_VerticeCount + i] = vert.uv0;
+            m_Colors[m_VerticeCount + i] = vert.color;
             
             if(i % 4 == 0)
             {
@@ -521,7 +527,7 @@ public class DebugTextDrawer : DebugGeometryRenderer
             }
         }
 
-        m_VerticeCount += vertices.Count;
+        m_VerticeCount += vertCount;
         m_IndicesCount += indiceCount;
     }
 }

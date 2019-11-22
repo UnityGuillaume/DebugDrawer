@@ -26,13 +26,13 @@ public class TestScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        timer += Time.deltaTime;
-        if (timer > 3.0f)
-        {
-            timer = 0;
-            PickNewPoint();
-        }
-        
+//        timer += Time.deltaTime;
+//        if (timer > 3.0f)
+//        {
+//            timer = 0;
+//            PickNewPoint();
+//        }
+
 //        DebugDrawer.DrawPixelScreenQuad(new Vector3[]
 //        {
 //            new Vector3(10,10, 0),
@@ -55,8 +55,8 @@ public class TestScript : MonoBehaviour
 //            Color.green, Color.green, Color.blue, Color.blue 
 //        });
 
-        for(int i = 0; i < 300; ++i)
-            DebugDrawer.DrawTextScreenSpace(new Vector3(Random.Range(200, Screen.width - 200), Random.Range(200, Screen.height - 200), 0), Random.ColorHSV(), "This IS a TEST string");
+        for(int i = 0; i < 1000; ++i)
+            DebugDrawer.DrawTextPixelScreen(new Vector3(Random.Range(200, Screen.width - 200), Random.Range(200, Screen.height - 200), 0), Random.ColorHSV(), "This IS a TEST string");
 
 //        for (int i = 0; i < count; ++i)
 //        {
